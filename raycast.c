@@ -11,13 +11,29 @@
 //struct for holding objects
 typedef struct {
     char *type;
-    double *color;
+    double *difColor;
+    double *specColor;
     double *position;
     double *normal;
     double radius;
 } Object;
 
 Object objects[128]; //128 objects per assignment
+
+//struct for holding lights
+typedef struct {
+    char *type;
+    double *position;
+    double *color;
+    double radialA0;
+    double radialA1;
+    double radialA2;
+    double theta;
+    double angularA0;
+    double *direction; 
+} Light;
+
+Light lights[128]; //array of lights
 
 int line = 1;
 int Width;
@@ -133,9 +149,10 @@ void read_scene(char* filename) {
   skip_ws(json);
 
   //Find the objects
-  int index = -1;
+  int objectIndex = -1;
+  int lightIndex = -1;
+  int lightPosition = 0; //variable to keep track of light or object because they both have a "position" variable
   while (1) {
-    index++;
     c = fgetc(json);
     if (c == ']') {
       fprintf(stderr, "Error: This is the worst scene file EVER.\n");
@@ -162,11 +179,18 @@ void read_scene(char* filename) {
 
       if (strcmp(value, "camera") == 0) {
         //Do nothing, camera isn't an object in the scene.
-        index--;
       } else if (strcmp(value, "sphere") == 0) {
-        objects[index].type = "sphere";
+        objectIndex++;
+        objects[objectIndex].type = "sphere";
+        lightPosition = 0;
       } else if (strcmp(value, "plane") == 0) {
-        objects[index].type = "plane";
+        objectIndex++;
+        objects[objectIndex].type = "plane";
+        lightPosition = 0;
+      } else if (strcmp(value, "light") == 0) {
+        lightIndex++;
+        lights[lightIndex].type = "light";
+        lightPosition = 1;
       } else {
         fprintf(stderr, "Error: Unknown type, \"%s\", on line number %d.\n", value, line);
         exit(1);
@@ -176,44 +200,73 @@ void read_scene(char* filename) {
 
       while (1) {
 
-    c = next_c(json);
-    if (c == '}') {
-      //stop parsing this object
-      break;
-    } else if (c == ',') {
-      //read another field
-      skip_ws(json);
-      char* key = next_string(json);
-      skip_ws(json);
-      expect_c(json, ':');
-      skip_ws(json);
-      if (strcmp(key, "width") == 0) {
-        cameraWidth = next_number(json);
-      }
-      else if (strcmp(key, "height") == 0) {
-        cameraHeight = next_number(json);
-      }
-      else if (strcmp(key, "radius") == 0) {
-        objects[index].radius = next_number(json);
-      }
-      else if (strcmp(key, "color") == 0) {
-        objects[index].color = next_vector(json);
-      }
-      else if (strcmp(key, "position") == 0) {
-        objects[index].position = next_vector(json);
-      }
-      else if (strcmp(key, "normal") == 0) {
-        objects[index].normal = next_vector(json);
-      }
-      else {
-        fprintf(stderr, "Error: Unknown property, \"%s\", on line %d.\n",
-          key, line);
-      }
-      skip_ws(json);
-    } else {
-      fprintf(stderr, "Error: Unexpected value on line %d\n", line);
-      exit(1);
-    }
+        c = next_c(json);
+        if (c == '}') {
+          //stop parsing this object
+          break;
+        } else if (c == ',') {
+          //read another field
+          skip_ws(json);
+          char* key = next_string(json);
+          skip_ws(json);
+          expect_c(json, ':');
+          skip_ws(json);
+          if (strcmp(key, "width") == 0) {
+            cameraWidth = next_number(json);
+          }
+          else if (strcmp(key, "height") == 0) {
+            cameraHeight = next_number(json);
+          }
+          else if (strcmp(key, "radius") == 0) {
+            objects[objectIndex].radius = next_number(json);
+          }
+          else if (strcmp(key, "diffuse_color") == 0) {
+            objects[objectIndex].difColor = next_vector(json);
+          }
+          else if (strcmp(key, "specular_color") == 0) {
+            objects[objectIndex].specColor = next_vector(json);
+          }
+          else if (strcmp(key, "position") == 0) {
+            if(lightPosition == 1){
+              lights[lightIndex].position = next_vector(json);
+            }
+            else{
+              objects[objectIndex].position = next_vector(json);
+            }
+          }
+          else if (strcmp(key, "normal") == 0) {
+            objects[objectIndex].normal = next_vector(json);
+          }
+          else if (strcmp(key, "color") == 0) {
+            lights[lightIndex].color = next_vector(json);
+          }
+          else if (strcmp(key, "radial-a0") == 0) {
+            lights[lightIndex].radialA0 = next_number(json);
+          }
+          else if (strcmp(key, "radial-a1") == 0) {
+            lights[lightIndex].radialA1 = next_number(json);
+          }
+          else if (strcmp(key, "radial-a2") == 0) {
+            lights[lightIndex].radialA2 = next_number(json);
+          }
+          else if (strcmp(key, "theta") == 0) {
+            lights[lightIndex].theta = next_number(json);
+          }
+          else if (strcmp(key, "angular-a0") == 0) {
+            lights[lightIndex].angularA0 = next_number(json);
+          }
+          else if (strcmp(key, "direction") == 0) {
+            lights[lightIndex].direction = next_vector(json);
+          } 
+          else {
+            fprintf(stderr, "Error: Unknown property, \"%s\", on line %d.\n",
+              key, line);
+          }
+          skip_ws(json);
+        } else {
+          fprintf(stderr, "Error: Unexpected value on line %d\n", line);
+          exit(1);
+        }
       }
       skip_ws(json);
       c = next_c(json);
@@ -262,7 +315,7 @@ void raycast() {
       double t;
 
       //loop through all objects
-      while(objects[objectIndex].color != NULL){
+      while(objects[objectIndex].difColor != NULL){
 
         if(strcmp(objects[objectIndex].type, "sphere") == 0){
 
@@ -285,7 +338,7 @@ void raycast() {
             //set new min so that close spheres display over further ones
             if (min >= t){
               min = t;
-              viewPlane[index] = objects[objectIndex].color; //push color into viewPane
+              viewPlane[index] = objects[objectIndex].difColor; //push color into viewPane
             }
           }
         }
@@ -295,7 +348,7 @@ void raycast() {
           t = -(objects[objectIndex].normal[0] * (0 - objects[objectIndex].position[0]) + objects[objectIndex].normal[1] * (0 - objects[objectIndex].position[1]) + objects[objectIndex].normal[2] * (0 - objects[objectIndex].position[2])) / (objects[objectIndex].normal[0] * x + objects[objectIndex].normal[1] * y + objects[objectIndex].normal[2] * z);
 
           if (min >= t) {
-            viewPlane[index] = objects[objectIndex].color; //push color into viewPane
+            viewPlane[index] = objects[objectIndex].difColor; //push color into viewPane
             min = t;
           }
         }
@@ -359,6 +412,77 @@ void write_scene(char *filename, int format) {
   fclose(ppm);
 }
 
+void testPrint(){
+
+  printf("testing\n");
+
+  int index = 0;
+
+  while(objects[index].type != NULL){
+
+    if (objects[index].type != NULL) {
+      printf("type: %s\n", objects[index].type);
+    }
+
+    if (objects[index].radius != 0) {
+      printf("radius: %f\n", objects[index].radius);
+    }
+
+    if (objects[index].difColor != NULL) {
+      printf("difColor: %f, %f, %f\n", objects[index].difColor[0], objects[index].difColor[1], objects[index].difColor[2]);
+    }
+
+    if (objects[index].specColor != NULL) {
+      printf("specColor: %f, %f, %f\n", objects[index].specColor[0], objects[index].specColor[1], objects[index].specColor[2]);
+    }
+
+    if (objects[index].position != NULL) {
+      printf("postion: %f, %f, %f\n", objects[index].position[0], objects[index].position[1], objects[index].position[2]);
+    }
+    if (objects[index].normal != NULL) {
+      printf("normal: %f, %f, %f\n", objects[index].normal[0], objects[index].normal[1], objects[index].normal[2]);
+    }
+    index++;
+    printf("\n\n");
+  }
+
+
+  index = 0;
+
+  while (lights[index].type != NULL) {
+
+    if (lights[index].type != NULL) {
+      printf("type: %s\n", lights[index].type);
+    }
+    if (lights[index].position != NULL) {
+      printf("postion: %f, %f, %f\n", lights[index].position[0], lights[index].position[1], lights[index].position[2]);
+    }
+    if (lights[index].color != NULL) {
+      printf("color: %f, %f, %f\n", lights[index].color[0], lights[index].color[1], lights[index].color[2]);
+    }
+    if (lights[index].direction != NULL) {
+      printf("direction: %f, %f, %f\n", lights[index].direction[0], lights[index].direction[1], lights[index].direction[2]);
+    }
+    if (lights[index].radialA0 != 0) {
+      printf("radialA0: %f\n", lights[index].radialA0);
+    }
+    if (lights[index].radialA1 != 0) {
+      printf("radialA1: %f\n", lights[index].radialA1);
+    }
+    if (lights[index].radialA2 != 0) {
+      printf("radialA2: %f\n", lights[index].radialA2);
+    }
+    if (lights[index].theta != 0) {
+      printf("theta: %f\n", lights[index].theta);
+    }
+    if (lights[index].angularA0 != 0) {
+      printf("angularA0: %f\n", lights[index].angularA0);
+    }
+    index++;
+    printf("\n\n");
+  }
+  
+}
 
 int main(int argc, char** argv) {
 
@@ -373,7 +497,10 @@ int main(int argc, char** argv) {
     read_scene(argv[3]);
 
     viewPlane = (double **)malloc(Width * Height * 3 * sizeof(double));  
-    raycast();
-    write_scene(argv[4], 3);
+
+    testPrint();
+
+    //raycast();
+    //write_scene(argv[4], 3);
     return 0;
 }

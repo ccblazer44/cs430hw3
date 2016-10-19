@@ -4,7 +4,6 @@
 #include <ctype.h>
 #include <math.h>
 
-
 //#define DEBUG
 #define AUTHOR "CBLAZER"
 #define RGB_NUMBER 255
@@ -241,8 +240,8 @@ void raycast() {
   int objectIndex;
 
   //loop through all pixels
-  for(i = Height; i > 0; i--){
-    for(j = Width; j > 0; j--){
+  for(i = 0; i < Height; i++){
+    for(j = 0; j < Width; j++){
 
       double x, y, z = 1; //z is always 1 because the view plane is 1 unit away from camera
 
@@ -256,8 +255,7 @@ void raycast() {
       //replace vector with unit vector
       x = x/magnitude;
       y = y/magnitude;
-      z = z/magnitude;
-      double d;
+      z = z/magnitude; 
 
       double min = 999999999999999999; //set min so that close objects display over further ones
       objectIndex = 0;
@@ -268,53 +266,37 @@ void raycast() {
 
         if(strcmp(objects[objectIndex].type, "sphere") == 0){
 
-          double a, b, c;
+          //use unit vector to calculate collision
+          t = (((x * objects[objectIndex].position[0]) + (y * objects[objectIndex].position[1]) + (z * objects[objectIndex].position[2]))/(pow(x, 2) + pow(y, 2) + pow(z, 2)));
 
-          a = (pow(x, 2) + pow(y, 2) + pow(z, 2));
+          //find point on vector closest to center of sphere
+          double tCloseX = x * t;
+          double tCloseY = y * t;
+          double tCloseZ = z * t;
+          double d = sqrt(pow((tCloseX - objects[objectIndex].position[0]), 2) + pow((tCloseY - objects[objectIndex].position[1]), 2) + pow((tCloseZ - objects[objectIndex].position[2]), 2));
 
-          b = 2 * (x * (0 - objects[objectIndex].position[0]) + y * (0 - objects[objectIndex].position[1]) + z * (0 - objects[objectIndex].position[2]));
+          //check if point is closer than radius (if there is an intersection)
+          if(d <= objects[objectIndex].radius){
 
-          c = pow((0 - objects[objectIndex].position[0]), 2) + pow((0 - objects[objectIndex].position[1]), 2) + pow((0 - objects[objectIndex].position[2]), 2) - pow(objects[objectIndex].radius, 2);
+            //find distance from camera to actual intersection point and set it to t
+            double a = sqrt(pow(objects[objectIndex].radius, 2) - pow(d, 2));
+            t = t - a;
 
-          double t0, t1, t;
-
-          t0 = (-b - pow((pow(b, 2) - 4*c*a), 0.5)) / 2*a;
-          t1 = (-b + pow((pow(b, 2) - 4*c*a), 0.5)) / 2*a;
-
-          if (t0 < 0){
-            t = t1;
-          }
-          else{
-            t = t0;
-          }
-
-          if (min >= t){
+            //set new min so that close spheres display over further ones
+            if (min >= t){
               min = t;
               viewPlane[index] = objects[objectIndex].color; //push color into viewPane
+            }
           }
- 
         }
         else if(strcmp(objects[objectIndex].type, "plane") == 0){
 
-          double a, b, c;
+          //use unit vector to calculate collision
+          t = -(objects[objectIndex].normal[0] * (0 - objects[objectIndex].position[0]) + objects[objectIndex].normal[1] * (0 - objects[objectIndex].position[1]) + objects[objectIndex].normal[2] * (0 - objects[objectIndex].position[2])) / (objects[objectIndex].normal[0] * x + objects[objectIndex].normal[1] * y + objects[objectIndex].normal[2] * z);
 
-          a = objects[objectIndex].normal[0];
-          b = objects[objectIndex].normal[1];
-          c = objects[objectIndex].normal[2];
-
-          double magnitude = sqrt(pow(a, 2) + pow(b, 2) + pow(c, 2));
-
-         //normalize normal vector
-          a = a/magnitude;
-          b = b/magnitude;
-          c = c/magnitude;
-
-          d = -((a * objects[objectIndex].position[0]) + (b * objects[objectIndex].position[1]) + (c * objects[objectIndex].position[2]));
-
-          t = -(d)/(x*a + y*b + z*c);
           if (min >= t) {
-            min = t;
             viewPlane[index] = objects[objectIndex].color; //push color into viewPane
+            min = t;
           }
         }
         objectIndex++;
@@ -390,8 +372,8 @@ int main(int argc, char** argv) {
 
     read_scene(argv[3]);
 
-    viewPlane = (double **)malloc(Width * Height * 3 * sizeof(double));
+    viewPlane = (double **)malloc(Width * Height * 3 * sizeof(double));  
     raycast();
-    write_scene(argv[4], 6);
+    write_scene(argv[4], 3);
     return 0;
 }

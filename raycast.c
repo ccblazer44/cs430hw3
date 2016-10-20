@@ -349,7 +349,7 @@ void raycast() {
   //loop through all pixels
   for(i = 0; i < Height; i++){
     for(j = 0; j < Width; j++){
-
+      printf("Pixel Test\n");
       double x, y, z = 1; //z is always 1 because the view plane is 1 unit away from camera
 
       //find vector
@@ -367,6 +367,7 @@ void raycast() {
       double min = 999999999999999999; //set min so that close objects display over further ones
       objectIndex = 0;
       double t;
+      int closestObjectIndex = 0;
 
       double poi[3];
       //loop through all objects
@@ -397,6 +398,7 @@ void raycast() {
               poi[0] = t * x;
               poi[1] = t * y;
               poi[2] = t * z;
+              closestObjectIndex = objectIndex;
             }
           }
         }
@@ -411,6 +413,7 @@ void raycast() {
             poi[0] = t * x;
             poi[1] = t * y;
             poi[2] = t * z;
+            closestObjectIndex = objectIndex;
           }
         }
         objectIndex++;
@@ -424,82 +427,94 @@ void raycast() {
       //loop through lights
       while(lights[lightIndex].color != NULL){
 
-        int lightVector[3];
-        int lightUnitVector[3];
+        //printf("light %d\n", lightIndex);
+
+        //printf("lights\n");
+
+        double lightVector[3];
+        double lightUnitVector[3];
 
         // lightVector[0] = poi[0] - lights[lightIndex].position[0];
         // lightVector[1] = poi[1] - lights[lightIndex].position[1];
         // lightVector[2] = poi[2] - lights[lightIndex].position[2];
 
         vectorSub(poi, lights[lightIndex].position, lightVector);
-
+        vectorUnit(lightVector, lightUnitVector);
 
        // double lightT =  sqrt(pow(lightVector[0], 2) + pow(lightVector[1], 2) + pow(lightVector[2], 2));
         double lightT = vectorMag(lightVector);
 
 
-
+        int shadow = 0; // 1 = shadow; -1 = no shadow
 
         int objectIndex2 = 0;
         t = -1;
         //loop through objects to find shadows
-        while(objects[objectIndex2].difColor != NULL){
+        while(shadow == 0) {
+          // Check different object
+          if (closestObjectIndex == objectIndex2) {
+            objectIndex2++;
+          }
+          // Check that object exists
+          if (objects[objectIndex2].difColor != NULL) {
+            double t; // Compare with lightT
+            if (strcmp(objects[objectIndex2].type, "sphere") == 0) {
+          
+              double shadowObject[3];
+              vectorSub(objects[objectIndex2].position, lights[lightIndex].position, shadowObject);
 
-          if(strcmp(objects[objectIndex2].type, "sphere") == 0){
+           
+              t = tClosestApproachSphere(lightUnitVector, shadowObject); 
+              double shadowObjectT[3]; 
+              vectorMult(lightUnitVector, t, shadowObjectT);
 
-            //use unit vector to calculate collision
-            //t = (((x * objects[objectIndex2].position[0]) + (y * objects[objectIndex2].position[1]) + (z * objects[objectIndex2].position[2]))/(pow(x, 2) + pow(y, 2) + pow(z, 2)));
-            double current[3];
-            vectorSub(objects[objectIndex2].position, lights[lightIndex].position, current);
-            t = tClosestApproachSphere(lightVector, current);
-
-            //find point on vector closest to center of sphere
-            double tCloseX = x * t;
-            double tCloseY = y * t;
-            double tCloseZ = z * t;
-            double d = sqrt(pow((tCloseX - objects[objectIndex2].position[0]), 2) + pow((tCloseY - objects[objectIndex2].position[1]), 2) + pow((tCloseZ - objects[objectIndex2].position[2]), 2));
-
-            //check if point is closer than radius (if there is an intersection)
-            if(d <= objects[objectIndex2].radius){
-
-              //find distance from camera to actual intersection point and set it to t
-              double a = sqrt(pow(objects[objectIndex2].radius, 2) - pow(d, 2));
-              t = t - a;
-
-              //set new min so that close spheres display over further ones
-              if (t > 0 && lightT >= t){
-                min = t;
-                viewPlane[index] = objects[objectIndex2].difColor; //push color into viewPane
-                poi[0] = t * x;
-                poi[1] = t * y;
-                poi[2] = t * z;
+              double dist = distance(shadowObjectT, objects[objectIndex2].position);
+              if (dist <= objects[objectIndex2].radius) {
+                double a = sqrt(pow(objects[objectIndex2].radius,2) - pow(dist,2));
+                t = t - a;
+                shadow = 1;
               }
             }
-          }
-          else if(strcmp(objects[objectIndex2].type, "plane") == 0){
+            else if (strcmp(objects[objectIndex2].type, "plane") == 0) {
 
-            //use unit vector to calculate collision
-            t = -(objects[objectIndex2].normal[0] * (0 - objects[objectIndex2].position[0]) + objects[objectIndex2].normal[1] * (0 - objects[objectIndex2].position[1]) + objects[objectIndex2].normal[2] * (0 - objects[objectIndex2].position[2])) / (objects[objectIndex2].normal[0] * x + objects[objectIndex2].normal[1] * y + objects[objectIndex2].normal[2] * z);
-
-            if (t > 0 && lightT >= t) {
-              viewPlane[index] = objects[objectIndex2].difColor; //push color into viewPane
-              min = t;
-              poi[0] = t * x;
-              poi[1] = t * y;
-              poi[2] = t * z;
             }
           }
+          else {
+            shadow = -1;
+          }
           objectIndex2++;
-
         }
-      }
 
+        //if shadow
+        printf("Pixel index: %d\n", index);
+        if(shadow == 1){
+          printf("Shadow\n");
+          //viewPlane[index] = objects[objectIndex].difColor;
+          viewPlane[index] = white;
+        }
+        else if (shadow == -1) {
+          //printf("index %d", index);
+          //printf("object index %d", objectIndex);
+          //printf("No shadow\n");
+          //printf("Color test %f, %f, %f\n", objects[closestObjectIndex].difColor[0], objects[closestObjectIndex].difColor[1], objects[closestObjectIndex].difColor[2]);
+          viewPlane[index] = objects[closestObjectIndex].difColor;
+        }
+        else {
+          printf("This shouldn't have happened\n");
+          viewPlane[index] = white;
+        }
+        lightIndex++;
+        if (lights[lightIndex].color == NULL) {
+          printf("End of lights\n");
+        }
+        printf("Testing %f\n", viewPlane[index][0]);
+      }
 
       // WORKING HERE ^^^^^
 
-      if(min == 999999999999999999){
-        viewPlane[index] = white;
-      }
+      /*if(min == 999999999999999999){
+        //viewPlane[index] = white;
+      }*/
       index++;
     }
   }
@@ -508,13 +523,13 @@ void raycast() {
 
 
 void write_scene(char *filename, int format) {
-
+  printf("start Writing\n");
   FILE *ppm = fopen(filename, "wb");
   if (!ppm) {
     fprintf(stderr, "Error opening ppm file\n");
     exit(1);
   }
-
+  printf("Opened successfully\n");
   //header
   if (format == 6) {
     fprintf(ppm, "P6\n");
@@ -522,17 +537,17 @@ void write_scene(char *filename, int format) {
   else if (format == 3) {
     fprintf(ppm, "P3\n");
   }
-
+  printf("format successful\n");
   fprintf(ppm, "# Created by %s\n", AUTHOR);
   fprintf(ppm, "%d %d\n", Width, Height);
   fprintf(ppm, "%d\n", RGB_NUMBER);
-
+  printf("Write successful\n");
 
   //image data
   int index;
   if (format == 6) {
     for (index = 0; index < Width * Height; index++) {
-
+      printf("Writing 6 %d\n", index);
       color = (int) (viewPlane[index][0] * 255); //cast color to int from the double stroed in viewPane
       fwrite(&color, 1, 1, ppm); //red
       color = (int) (viewPlane[index][1] * 255);
@@ -543,7 +558,8 @@ void write_scene(char *filename, int format) {
   }
   else if (format == 3) {
     for (index = 0; index < Width * Height; index++) {
-
+      printf("Writing 3 %d\n", index);
+      printf("viewplane[index] %f %f %f", viewPlane[index][0], viewPlane[index][1], viewPlane[index][2]);
       color = (int) (viewPlane[index][0] * 255);
       fprintf(ppm, "%d\n", color);
       color = (int) (viewPlane[index][1] * 255);

@@ -285,6 +285,40 @@ void read_scene(char* filename) {
 }
 
 
+void tClosestApproachPlane(){
+
+}
+
+void tClosestApproachSphere(){
+
+}
+
+void vectorAdd(){
+
+}
+
+void vectorSub(){
+
+}
+
+void vectorMult(){
+
+}
+
+void vectorDiv(){
+
+}
+
+void vectorDot(){
+
+}
+
+void vector
+
+void vectorUnit(){
+
+}
+
 void raycast() {
 
   int i;
@@ -314,6 +348,7 @@ void raycast() {
       objectIndex = 0;
       double t;
 
+      double poi[3];
       //loop through all objects
       while(objects[objectIndex].difColor != NULL){
 
@@ -336,9 +371,12 @@ void raycast() {
             t = t - a;
 
             //set new min so that close spheres display over further ones
-            if (min >= t){
+            if (t > 0 && min >= t){
               min = t;
               viewPlane[index] = objects[objectIndex].difColor; //push color into viewPane
+              poi[0] = t * x;
+              poi[1] = t * y;
+              poi[2] = t * z;
             }
           }
         }
@@ -347,13 +385,90 @@ void raycast() {
           //use unit vector to calculate collision
           t = -(objects[objectIndex].normal[0] * (0 - objects[objectIndex].position[0]) + objects[objectIndex].normal[1] * (0 - objects[objectIndex].position[1]) + objects[objectIndex].normal[2] * (0 - objects[objectIndex].position[2])) / (objects[objectIndex].normal[0] * x + objects[objectIndex].normal[1] * y + objects[objectIndex].normal[2] * z);
 
-          if (min >= t) {
+          if (t > 0 && min >= t) {
             viewPlane[index] = objects[objectIndex].difColor; //push color into viewPane
             min = t;
+            poi[0] = t * x;
+            poi[1] = t * y;
+            poi[2] = t * z;
           }
         }
         objectIndex++;
       }
+      int lightIndex = 0;
+
+
+      //WORKING HEREvvvv
+
+
+      //loop through lights
+      while(lights[lightIndex].color != NULL){
+
+        int lightVector[3];
+        int lightUnitVector[3];
+
+        lightVector[0] = poi[0] - lights[lightIndex].position[0];
+        lightVector[1] = poi[1] - lights[lightIndex].position[1];
+        lightVector[2] = poi[2] - lights[lightIndex].position[2];
+
+
+        double lightT =  sqrt(pow(lightVector[0], 2) + pow(lightVector[1], 2) + pow(lightVector[2], 2));
+
+
+        int objectIndex2 = 0;
+        t = -1;
+        //loop through objects to find shadows
+        while(objects[objectIndex2].difColor != NULL){
+
+          if(strcmp(objects[objectIndex2].type, "sphere") == 0){
+
+            //use unit vector to calculate collision
+            t = (((x * objects[objectIndex2].position[0]) + (y * objects[objectIndex2].position[1]) + (z * objects[objectIndex2].position[2]))/(pow(x, 2) + pow(y, 2) + pow(z, 2)));
+
+            //find point on vector closest to center of sphere
+            double tCloseX = x * t;
+            double tCloseY = y * t;
+            double tCloseZ = z * t;
+            double d = sqrt(pow((tCloseX - objects[objectIndex2].position[0]), 2) + pow((tCloseY - objects[objectIndex2].position[1]), 2) + pow((tCloseZ - objects[objectIndex2].position[2]), 2));
+
+            //check if point is closer than radius (if there is an intersection)
+            if(d <= objects[objectIndex2].radius){
+
+              //find distance from camera to actual intersection point and set it to t
+              double a = sqrt(pow(objects[objectIndex2].radius, 2) - pow(d, 2));
+              t = t - a;
+
+              //set new min so that close spheres display over further ones
+              if (t > 0 && min >= t){
+                min = t;
+                viewPlane[index] = objects[objectIndex2].difColor; //push color into viewPane
+                poi[0] = t * x;
+                poi[1] = t * y;
+                poi[2] = t * z;
+              }
+            }
+          }
+          else if(strcmp(objects[objectIndex2].type, "plane") == 0){
+
+            //use unit vector to calculate collision
+            t = -(objects[objectIndex2].normal[0] * (0 - objects[objectIndex2].position[0]) + objects[objectIndex2].normal[1] * (0 - objects[objectIndex2].position[1]) + objects[objectIndex2].normal[2] * (0 - objects[objectIndex2].position[2])) / (objects[objectIndex2].normal[0] * x + objects[objectIndex2].normal[1] * y + objects[objectIndex2].normal[2] * z);
+
+            if (t > 0 && min >= t) {
+              viewPlane[index] = objects[objectIndex2].difColor; //push color into viewPane
+              min = t;
+              poi[0] = t * x;
+              poi[1] = t * y;
+              poi[2] = t * z;
+            }
+          }
+          objectIndex2++;
+
+        }
+      }
+
+
+      // WORKING HERE ^^^^^
+
       if(min == 999999999999999999){
         viewPlane[index] = white;
       }
@@ -361,6 +476,7 @@ void raycast() {
     }
   }
 }
+
 
 
 void write_scene(char *filename, int format) {
@@ -498,9 +614,9 @@ int main(int argc, char** argv) {
 
     viewPlane = (double **)malloc(Width * Height * 3 * sizeof(double));  
 
-    testPrint();
+    //testPrint();
 
-    //raycast();
-    //write_scene(argv[4], 3);
+    raycast();
+    write_scene(argv[4], 3);
     return 0;
 }

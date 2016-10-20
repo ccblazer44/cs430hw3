@@ -284,39 +284,59 @@ void read_scene(char* filename) {
   }
 }
 
+double tClosestApproachPlane(double *normal, double *origin, double *position, double *lookUVector) {
+  double out = -(normal[0] * (origin[0] - position[0]) + normal[1] * (origin[1] - position[1]) + normal[2] * (origin[2] - position[2])) / (normal[0] * lookUVector[0] + normal[1] * lookUVector[1] + normal[2] * lookUVector[2]);
+  return(out);
+}
 
-void tClosestApproachPlane(){
+double tClosestApproachSphere(double *in1, double *in2){
+  double out = (in1[0] * in2[0] + in1[1] * in2[1] + in1[2] * in2[2]) / (pow(in1[0],2) + pow(in1[1],2) + pow(in1[2],2));
+  return(out);
+}
+
+void vectorAdd(double* in1, double* in2, double* out){
+  out[0] = in1[0] + in2[0];
+  out[1] = in1[1] + in2[1];
+  out[2] = in1[2] + in2[2];
+}
+
+void vectorSub(double* in1, double* in2, double* out){
+  out[0] = in1[0] - in2[0];
+  out[1] = in1[1] - in2[1];
+  out[2] = in1[2] - in2[2];
+}
+
+void vectorMult(double* in1, double in2, double* out){
+  out[0] = in1[0] * in2;
+  out[1] = in1[1] * in2;
+  out[2] = in1[2] * in2;
+}
+
+void vectorDiv(double* in1, double in2, double* out){
+  out[0] = in1[0] / in2;
+  out[1] = in1[1] / in2;
+  out[2] = in1[2] / in2;
+}
+
+double vectorDot(double* in1, double* in2){
+  double out = (in1[0] * in2[0] + in1[1] * in2[1] + in1[2] * in2[2]);
+  return(out);
+}
+
+double vectorMag(double *vector) {
+  double out = sqrt(pow(vector[0], 2) + pow(vector[1], 2) + pow(vector[2], 2));
+  return(out);
+}
+
+void vectorUnit(double *in, double *out){
+
+  vectorDiv(in, vectorMag(in), out);
 
 }
 
-void tClosestApproachSphere(){
-
-}
-
-void vectorAdd(){
-
-}
-
-void vectorSub(){
-
-}
-
-void vectorMult(){
-
-}
-
-void vectorDiv(){
-
-}
-
-void vectorDot(){
-
-}
-
-void vector
-
-void vectorUnit(){
-
+double distance(double* in1, double* in2){
+  double out = sqrt(pow(in1[0] - in2[0], 2) + pow(in1[1] - in2[1], 2) + pow(in1[2] - in2[2], 2));
+  return(out);
 }
 
 void raycast() {
@@ -373,7 +393,7 @@ void raycast() {
             //set new min so that close spheres display over further ones
             if (t > 0 && min >= t){
               min = t;
-              viewPlane[index] = objects[objectIndex].difColor; //push color into viewPane
+              //viewPlane[index] = objects[objectIndex].difColor; //push color into viewPane
               poi[0] = t * x;
               poi[1] = t * y;
               poi[2] = t * z;
@@ -386,7 +406,7 @@ void raycast() {
           t = -(objects[objectIndex].normal[0] * (0 - objects[objectIndex].position[0]) + objects[objectIndex].normal[1] * (0 - objects[objectIndex].position[1]) + objects[objectIndex].normal[2] * (0 - objects[objectIndex].position[2])) / (objects[objectIndex].normal[0] * x + objects[objectIndex].normal[1] * y + objects[objectIndex].normal[2] * z);
 
           if (t > 0 && min >= t) {
-            viewPlane[index] = objects[objectIndex].difColor; //push color into viewPane
+            //viewPlane[index] = objects[objectIndex].difColor; //push color into viewPane
             min = t;
             poi[0] = t * x;
             poi[1] = t * y;
@@ -407,12 +427,17 @@ void raycast() {
         int lightVector[3];
         int lightUnitVector[3];
 
-        lightVector[0] = poi[0] - lights[lightIndex].position[0];
-        lightVector[1] = poi[1] - lights[lightIndex].position[1];
-        lightVector[2] = poi[2] - lights[lightIndex].position[2];
+        // lightVector[0] = poi[0] - lights[lightIndex].position[0];
+        // lightVector[1] = poi[1] - lights[lightIndex].position[1];
+        // lightVector[2] = poi[2] - lights[lightIndex].position[2];
+
+        vectorSub(poi, lights[lightIndex].position, lightVector);
 
 
-        double lightT =  sqrt(pow(lightVector[0], 2) + pow(lightVector[1], 2) + pow(lightVector[2], 2));
+       // double lightT =  sqrt(pow(lightVector[0], 2) + pow(lightVector[1], 2) + pow(lightVector[2], 2));
+        double lightT = vectorMag(lightVector);
+
+
 
 
         int objectIndex2 = 0;
@@ -423,7 +448,10 @@ void raycast() {
           if(strcmp(objects[objectIndex2].type, "sphere") == 0){
 
             //use unit vector to calculate collision
-            t = (((x * objects[objectIndex2].position[0]) + (y * objects[objectIndex2].position[1]) + (z * objects[objectIndex2].position[2]))/(pow(x, 2) + pow(y, 2) + pow(z, 2)));
+            //t = (((x * objects[objectIndex2].position[0]) + (y * objects[objectIndex2].position[1]) + (z * objects[objectIndex2].position[2]))/(pow(x, 2) + pow(y, 2) + pow(z, 2)));
+            double current[3];
+            vectorSub(objects[objectIndex2].position, lights[lightIndex].position, current);
+            t = tClosestApproachSphere(lightVector, current);
 
             //find point on vector closest to center of sphere
             double tCloseX = x * t;
@@ -439,7 +467,7 @@ void raycast() {
               t = t - a;
 
               //set new min so that close spheres display over further ones
-              if (t > 0 && min >= t){
+              if (t > 0 && lightT >= t){
                 min = t;
                 viewPlane[index] = objects[objectIndex2].difColor; //push color into viewPane
                 poi[0] = t * x;
@@ -453,7 +481,7 @@ void raycast() {
             //use unit vector to calculate collision
             t = -(objects[objectIndex2].normal[0] * (0 - objects[objectIndex2].position[0]) + objects[objectIndex2].normal[1] * (0 - objects[objectIndex2].position[1]) + objects[objectIndex2].normal[2] * (0 - objects[objectIndex2].position[2])) / (objects[objectIndex2].normal[0] * x + objects[objectIndex2].normal[1] * y + objects[objectIndex2].normal[2] * z);
 
-            if (t > 0 && min >= t) {
+            if (t > 0 && lightT >= t) {
               viewPlane[index] = objects[objectIndex2].difColor; //push color into viewPane
               min = t;
               poi[0] = t * x;

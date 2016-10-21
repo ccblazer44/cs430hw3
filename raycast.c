@@ -33,6 +33,12 @@ typedef struct {
     double *direction; 
 } Light;
 
+typedef struct {
+    double red;
+    double green;
+    double blue;
+} Pixel;
+
 Light lights[128]; //array of lights
 
 int line = 1;
@@ -41,7 +47,7 @@ int Height;
 int color;
 double cameraWidth;
 double cameraHeight;
-double **viewPlane; //2d array to store pixel color data from raycast
+Pixel *viewPlane; //2d array to store pixel color data from raycast
 double black[3] = {0,0,0};
 
 //number maintenance
@@ -342,21 +348,19 @@ double distance(double* in1, double* in2){
 void vectorReflect(double* d, double* n, double* r){
 
 
-  //vectorUnit(d, d);
-  //vectorUnit(n, n);
-
+  vectorUnit(d, d);
+  vectorUnit(n, n);
   double dotProduct = vectorDot(d, n);
-
-  vectorMult(n, dotProduct, n);
-
-  vectorMult(n, 2, n);
-
-  vectorSub(d, n, r);
-
-  //vectorUnit(r, r);
-
-
-
+  if(dotProduct < 0){
+    vectorMult(n, dotProduct, n);
+    vectorMult(n, 2.0, n);
+    vectorSub(d, n, r);
+    vectorUnit(r, r);
+  }
+  else{
+    vectorMult(d, 0, r);
+  }
+  
 }
 
 void raycast() {
@@ -369,7 +373,12 @@ void raycast() {
   //loop through all pixels
   for(i = 0; i < Height; i++){
     for(j = 0; j < Width; j++){
-      printf("Pixel Test\n");
+
+      viewPlane[index].red = 0;
+      viewPlane[index].green = 0;
+      viewPlane[index].blue = 0;
+
+      //printf("Pixel Test\n");
       double x, y, z = 1; //z is always 1 because the view plane is 1 unit away from camera
 
       //find vector
@@ -510,20 +519,75 @@ void raycast() {
         if(shadow == 1){
           //printf("Shadow\n");
           //viewPlane[index] = objects[objectIndex].difColor;
-          viewPlane[index] = black;
+          //viewPlane[index] = black;
         }
         else if (shadow == -1) {
 
           // WORKING HERE vvvv
 
+          
+          double radialAttenuation = (lights[lightIndex].radialA2 * pow(lightT, 2) + lights[lightIndex].radialA1 * lightT + lights[lightIndex].radialA0);
 
+          double difContribution[3];
+          double specContribution[3];
+          double normal[3];
+
+          if (strcmp(objects[closestObjectIndex].type, "sphere") == 0){
+            vectorSub(poi, objects[closestObjectIndex].position, normal);
+          }
+          else if (strcmp(objects[closestObjectIndex].type, "plane") == 0){
+            normal[0] = objects[closestObjectIndex].normal[0];
+            normal[1] = objects[closestObjectIndex].normal[1];
+            normal[2] = objects[closestObjectIndex].normal[2];
+          }
+          vectorUnit(normal, normal);
+
+          double dotDif = -1 * vectorDot(lightVector, normal);
+
+          difContribution[0] = dotDif * lights[lightIndex].color[0] * objects[closestObjectIndex].difColor[0];
+          difContribution[1] = dotDif * lights[lightIndex].color[1] * objects[closestObjectIndex].difColor[1];
+          difContribution[2] = dotDif * lights[lightIndex].color[2] * objects[closestObjectIndex].difColor[2];
+          //printf("please dont segfault\n");
+
+          printf("dotDif %f\n", dotDif);
+          printf("difContribution %f %f %f\n", difContribution[0], difContribution[1], difContribution[2]);
+
+
+          double temp[3];
+          vectorMult(difContribution, radialAttenuation, temp);
+          printf("temp %f %f %f", temp[0], temp[1], temp[2]);
+          if(temp[0] > 1){
+            temp[0] = 1;
+          }
+          if(temp[1] > 1){
+            temp[1] = 1;
+          }
+          if(temp[2] > 1){
+            temp[2] = 1;
+          }
+
+          viewPlane[index].red = temp[0];
+          viewPlane[index].green = temp[1];
+          viewPlane[index].blue = temp[2];
+
+          //printf("viewplane[index] %f %f %f\n", viewPlane[index][0], viewPlane[index][1], viewPlane[index][2]);
+          // printf("index %d\n", index);
+
+          // viewPlane[index][0] += radialAttenuation * difContribution[0];
+          // viewPlane[index][1] += radialAttenuation * difContribution[1];
+          // viewPlane[index][2] += radialAttenuation * difContribution[2];
+
+          //printf("index: %d\n", index);
 
 
           // WORKING HERE ^^^^
 
 
+          // viewPlane[index][0] += objects[closestObjectIndex].difColor[0];
+          // viewPlane[index][1] += objects[closestObjectIndex].difColor[1];
+          // viewPlane[index][2] += objects[closestObjectIndex].difColor[2];
 
-
+          //viewPlane[index] = objects[closestObjectIndex].difColor;
 
 
 
@@ -532,17 +596,16 @@ void raycast() {
           //printf("object index %d", objectIndex);
           //printf("No shadow\n");
           //printf("Color test %f, %f, %f\n", objects[closestObjectIndex].difColor[0], objects[closestObjectIndex].difColor[1], objects[closestObjectIndex].difColor[2]);
-          viewPlane[index] = objects[closestObjectIndex].difColor;
+          //viewPlane[index] = objects[closestObjectIndex].difColor;
         }
         else {
           printf("This shouldn't have happened\n");
-          viewPlane[index] = black;
         }
         lightIndex++;
         if (lights[lightIndex].color == NULL) {
-          printf("End of lights\n");
+          //printf("End of lights\n");
         }
-        printf("Testing %f\n", viewPlane[index][0]);
+        
       }
 
       // WORKING HERE ^^^^^
@@ -558,13 +621,11 @@ void raycast() {
 
 
 void write_scene(char *filename, int format) {
-  printf("start Writing\n");
   FILE *ppm = fopen(filename, "wb");
   if (!ppm) {
     fprintf(stderr, "Error opening ppm file\n");
     exit(1);
   }
-  printf("Opened successfully\n");
   //header
   if (format == 6) {
     fprintf(ppm, "P6\n");
@@ -572,34 +633,33 @@ void write_scene(char *filename, int format) {
   else if (format == 3) {
     fprintf(ppm, "P3\n");
   }
-  printf("format successful\n");
   fprintf(ppm, "# Created by %s\n", AUTHOR);
   fprintf(ppm, "%d %d\n", Width, Height);
   fprintf(ppm, "%d\n", RGB_NUMBER);
-  printf("Write successful\n");
 
   //image data
   int index;
   if (format == 6) {
     for (index = 0; index < Width * Height; index++) {
-      printf("Writing 6 %d\n", index);
-      color = (int) (viewPlane[index][0] * 255); //cast color to int from the double stroed in viewPane
+      color = (int) (viewPlane[index].red * 255); //cast color to int from the double stroed in viewPane
       fwrite(&color, 1, 1, ppm); //red
-      color = (int) (viewPlane[index][1] * 255);
+      color = (int) (viewPlane[index].green * 255);
       fwrite(&color, 1, 1, ppm); //green
-      color = (int) (viewPlane[index][2] * 255);
+      color = (int) (viewPlane[index].blue * 255);
       fwrite(&color, 1, 1, ppm); //blue
     }
   }
   else if (format == 3) {
     for (index = 0; index < Width * Height; index++) {
-      printf("Writing 3 %d\n", index);
-      printf("viewplane[index] %f %f %f", viewPlane[index][0], viewPlane[index][1], viewPlane[index][2]);
-      color = (int) (viewPlane[index][0] * 255);
+
+      // printf("index %d\n", index);
+      // printf("viewPlane[index][0] %f", viewPlane[index][1]);
+      color = (int) (viewPlane[index].red * 255);
       fprintf(ppm, "%d\n", color);
-      color = (int) (viewPlane[index][1] * 255);
+      
+      color = (int) (viewPlane[index].green * 255);
       fprintf(ppm, "%d\n", color);
-      color = (int) (viewPlane[index][2] * 255);
+      color = (int) (viewPlane[index].blue * 255);
       fprintf(ppm, "%d\n", color);
     }
   }
@@ -679,6 +739,7 @@ void testPrint(){
   
 }
 
+
 int main(int argc, char** argv) {
 
   if (argc != 5){
@@ -691,17 +752,10 @@ int main(int argc, char** argv) {
 
     read_scene(argv[3]);
 
-    viewPlane = (double **)malloc(Width * Height * 3 * sizeof(double));  
+    viewPlane = (Pixel *)malloc(Width * Height * sizeof(Pixel));  
 
-    double vect[3] = {1,0,0};
-    double norm[3] = {-1,-1,0};
-    double *temp3;
-
-    vectorReflect(vect, norm, temp3);
-    printf("%f %f %f\n", temp3[0], temp3[1], temp3[2]);
     //testPrint();
-
-    //raycast();
-    //write_scene(argv[4], 3);
+    raycast();
+    write_scene(argv[4], 3);
     return 0;
 }

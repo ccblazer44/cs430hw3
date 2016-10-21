@@ -42,7 +42,7 @@ int color;
 double cameraWidth;
 double cameraHeight;
 double **viewPlane; //2d array to store pixel color data from raycast
-double white[3] = {1,1,1};
+double black[3] = {0,0,0};
 
 //number maintenance
 int next_c(FILE* json) {
@@ -339,6 +339,26 @@ double distance(double* in1, double* in2){
   return(out);
 }
 
+void vectorReflect(double* d, double* n, double* r){
+
+
+  //vectorUnit(d, d);
+  //vectorUnit(n, n);
+
+  double dotProduct = vectorDot(d, n);
+
+  vectorMult(n, dotProduct, n);
+
+  vectorMult(n, 2, n);
+
+  vectorSub(d, n, r);
+
+  //vectorUnit(r, r);
+
+
+
+}
+
 void raycast() {
 
   int i;
@@ -486,13 +506,28 @@ void raycast() {
         }
 
         //if shadow
-        printf("Pixel index: %d\n", index);
+        //printf("Pixel index: %d\n", index);
         if(shadow == 1){
-          printf("Shadow\n");
+          //printf("Shadow\n");
           //viewPlane[index] = objects[objectIndex].difColor;
-          viewPlane[index] = white;
+          viewPlane[index] = black;
         }
         else if (shadow == -1) {
+
+          // WORKING HERE vvvv
+
+
+
+
+          // WORKING HERE ^^^^
+
+
+
+
+
+
+
+
           //printf("index %d", index);
           //printf("object index %d", objectIndex);
           //printf("No shadow\n");
@@ -501,7 +536,7 @@ void raycast() {
         }
         else {
           printf("This shouldn't have happened\n");
-          viewPlane[index] = white;
+          viewPlane[index] = black;
         }
         lightIndex++;
         if (lights[lightIndex].color == NULL) {
@@ -513,7 +548,7 @@ void raycast() {
       // WORKING HERE ^^^^^
 
       /*if(min == 999999999999999999){
-        //viewPlane[index] = white;
+        //viewPlane[index] = black;
       }*/
       index++;
     }
@@ -658,9 +693,15 @@ int main(int argc, char** argv) {
 
     viewPlane = (double **)malloc(Width * Height * 3 * sizeof(double));  
 
+    double vect[3] = {1,0,0};
+    double norm[3] = {-1,-1,0};
+    double *temp3;
+
+    vectorReflect(vect, norm, temp3);
+    printf("%f %f %f\n", temp3[0], temp3[1], temp3[2]);
     //testPrint();
 
-    raycast();
-    write_scene(argv[4], 3);
+    //raycast();
+    //write_scene(argv[4], 3);
     return 0;
 }
